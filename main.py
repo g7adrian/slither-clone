@@ -4,6 +4,7 @@ import math # Import math for area calculation
 from snake import Snake # Removed BASE_RADIUS import
 from background import draw_background # Import background drawing function
 from food import FoodManager, SPAWN_AREA_WIDTH, SPAWN_AREA_HEIGHT # Import FoodManager and boundary constants
+from movement_controller import PlayerController, AIController
 
 # Constants
 SCREEN_WIDTH = 1920
@@ -89,17 +90,15 @@ def main():
                 running = False
             # Only handle game input if playing
             if game_state == "playing":
-                if event.type == pygame.MOUSEBUTTONDOWN:
-                    if event.button == 1: # 1 is the left mouse button
-                        player_snake.start_boost()
-                elif event.type == pygame.MOUSEBUTTONUP:
-                    if event.button == 1:
-                        player_snake.stop_boost()
-                elif event.type == pygame.MOUSEWHEEL: # Handle scroll wheel
+                if event.type == pygame.MOUSEWHEEL: # Handle scroll wheel
                     # Increase/decrease zoom factor
                     manual_zoom_factor += event.y * ZOOM_SENSITIVITY
                     # Clamp zoom factor within limits
                     manual_zoom_factor = max(MIN_MANUAL_ZOOM, min(MAX_MANUAL_ZOOM, manual_zoom_factor))
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    if event.button == 3:  # Right mouse button
+                        is_ai = player_snake.toggle_controller()
+                        print(f"Switched to {'AI' if is_ai else 'Player'} control mode")
             # Allow closing window even when game over
 
         # --- Update Phase ---
