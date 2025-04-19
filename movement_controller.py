@@ -4,7 +4,7 @@ import random
 
 # Movement Constants
 SNAKE_SPEED = 1
-BOOST_SPEED = 2
+BOOST_SPEED = 4
 ROTATION_SPEED = 50
 ANGLE_TOLERANCE = 0.5
 MAX_MOUSE_MOVEMENT_SPEED = 100.0  # Maximum pixels per frame the mouse can move
@@ -46,36 +46,43 @@ class MovementController:
     
     def move(self, screen_center):
         """Base movement logic for the snake."""
-        # Update desired mouse position via implementation-specific method
+        # Update desired mouse position (subclass responsibility)
         self.update_desired_position()
-        
-        # Apply movement speed limits
+
+        # Apply movement speed limits to get actual mouse pos
         self._limit_mouse_movement()
-        
+
         # Calculate target direction from actual mouse position to screen center
         target_vector = self.actual_mouse_pos - screen_center
-        
+
         # Handle rotation if we have a valid target direction
         if target_vector.length_squared() > 0:
             target_direction = target_vector.copy().normalize()
-            self._rotate_to_target(target_direction)
-        
+            self._rotate_to_target(target_direction) # Updates self.snake.direction
+
         # Calculate current speed based on boost state
         current_speed = BOOST_SPEED if self.boosting else SNAKE_SPEED
-        
-        # Calculate new head position
+
+        # --- HEAD MOVEMENT ---
+        # Calculate new head position based on speed and direction
         new_head_pos = self.snake.head_pos + self.snake.direction * current_speed
-        
+
         # Update head position reference
         self.snake.head_pos = new_head_pos
-        
-        # Insert new head position at the front of the body list
-        self.snake.body.insert(0, self.snake.head_pos.copy())
-        
-        # Remove tail segment if body is longer than target length
-        target_segments = self.snake.length
-        while len(self.snake.body) > target_segments:
-            self.snake.body.pop()
+
+        # --- BODY UPDATE ---
+        # Update body positions based on the head path and desired spacing
+        # This now handles segment placement and length adjustment
+        self.snake.update_body()
+
+        # OLD BODY LOGIC (REMOVE/COMMENT OUT):
+        # # Insert new head position at the front of the body list
+        # self.snake.body.insert(0, self.snake.head_pos.copy())
+        #
+        # # Remove tail segment if body is longer than target length
+        # target_segments = self.snake.length
+        # while len(self.snake.body) > target_segments:
+        #     self.snake.body.pop()
     
     def _rotate_to_target(self, target_direction):
         """Rotate the snake's direction towards the target direction."""

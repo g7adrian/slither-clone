@@ -21,13 +21,17 @@ class Snake:
         self.head_pos = pygame.Vector2(x, y)
         self.weight = Snake.INITIAL_WEIGHT
         self.radius, self.length = self.__class__._calculate_size(self.weight)
-        # Body starts as just the head position repeated for the initial length
-        self.body = [self.head_pos.copy() for _ in range(self.length)]
         self.direction = pygame.Vector2(1, 0)
-        # Initialize the movement controller
         self.controller = controller_class(self)
-        # Track if AI controlled for color
         self.is_ai_controlled = isinstance(self.controller, AIController)
+
+        # NEW: Store head path and desired segment spacing
+        self.head_path = [self.head_pos.copy() for _ in range(5)] # Initialize with a few points
+        self.segment_spacing = self.radius * 1.5 # Default spacing (e.g., 1.5 times radius)
+
+        # Initialize body based on initial position and spacing
+        self.body = [self.head_pos.copy()] * self.length
+        self.update_body() # Calculate initial body segment positions
 
     @classmethod
     def _calculate_size(cls, weight):
@@ -77,7 +81,9 @@ class Snake:
         self.weight += amount
         # Update radius and target length (self.length)
         self.radius, self.length = self.__class__._calculate_size(self.weight)
-        # The move method will handle preserving segments based on new self.length 
+        # Adjust spacing based on new radius? Optional.
+        # self.segment_spacing = self.radius * 1.5
+        # Body length will adjust automatically in update_body
 
     def toggle_controller(self):
         """Switch between player and AI controller."""
@@ -99,4 +105,66 @@ class Snake:
 
     def handle_mouse_up(self, button):
         """Delegate to controller."""
-        self.controller.handle_mouse_up(button) 
+        self.controller.handle_mouse_up(button)
+
+    # NEW: Method to update body positions
+    def update_body(self):
+        """Recalculates body segment positions based on head path and spacing."""
+        # Ensure head_path has the current head position
+        if not self.head_path or self.head_pos.distance_to(self.head_path[-1]) > 1e-6:
+             self.head_path.append(self.head_pos.copy())
+
+        new_body = [self.head_pos.copy()] # First segment is always the head
+        current_segment_pos = self.head_pos.copy()
+        path_idx = len(self.head_path) - 1
+        dist_covered_on_path = 0.0
+
+        # Calculate positions for the remaining segments
+        for _ in range(1, self.length):
+            target_dist_back = self.segment_spacing # How far back from the previous segment
+
+            # Traverse the path backwards
+            while target_dist_back > 0 and path_idx > 0:
+                vec_to_prev_point = self.head_path[path_idx - 1] - self.head_path[path_idx]
+                dist_between_points = vec_to_prev_point.length()
+
+                if dist_between_points < 1e-6: # Skip zero-length segments in path
+                    path_idx -= 1
+                    continue
+
+                dist_available_on_segment = dist_between_points - dist_covered_on_path
+
+                if target_dist_back <= dist_available_on_segment:
+                    # The next segment position lies on the current path segment
+                    fraction = (dist_covered_on_path + target_dist_back) / dist_between_points
+                    current_segment_pos = self.head_path[path_idx] + vec_to_prev_point * fraction
+                    dist_covered_on_path += target_dist_back # Update how much of the current segment is used
+                    target_dist_back = 0 # Found the position
+                    break # Exit inner while loop
+                else:
+                    # Need to consume this entire segment and move to the previous one
+                    target_dist_back -= dist_available_on_segment
+                    dist_covered_on_path = 0.0 # Reset for the new path segment
+                    path_idx -= 1
+                    current_segment_pos = self.head_path[path_idx] # Move to the previous path point
+
+            if target_dist_back > 0:
+                # Ran out of path, place segment at the oldest point
+                current_segment_pos = self.head_path[0].copy()
+
+            new_body.append(current_segment_pos.copy())
+
+        self.body = new_body
+
+        # Prune old head path points (optional optimization)
+        # Keep enough path points to cover the snake's length plus buffer
+        max_path_length_needed = self.length * self.segment_spacing * 1.5
+        current_path_length = 0
+        keep_from_index = len(self.head_path) - 1
+        while keep_from_index > 0:
+            dist = self.head_path[keep_from_index].distance_to(self.head_path[keep_from_index-1])
+            if current_path_length + dist > max_path_length_needed:
+                break
+            current_path_length += dist
+            keep_from_index -= 1
+        self.head_path = self.head_path[keep_from_index:] 
